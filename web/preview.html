@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>UCC SCA — Department Archive & Activity RMS (Standalone Live Demo)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            uccTeal: '#1A7A6A',
+            uccDark: '#0F5548',
+            uccLight: '#E8F5F2',
+            uccNavy: '#1F3864',
+          }
+        }
+      }
+    }
+  </script>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #F8FAFC; color: #0F172A; }
+    .badge-pending { background-color: #FEF3C7; color: #92400E; border: 1px solid #FDE68A; }
+    .badge-approved { background-color: #D1FAE5; color: #065F46; border: 1px solid #A7F3D0; }
+    .badge-rejected { background-color: #FEE2E2; color: #991B1B; border: 1px solid #FECACA; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    // Seed Initial State
+    const initialUser = { name: 'Prof. Anitha Mary', role: 'faculty', email: 'faculty@ucc.edu.in' };
+    
+    const initialProposals = [
+      {
+        id: 'prop-1',
+        title: 'National Workshop on Generative AI & LLM Architecture',
+        category: 'Workshop',
+        proposed_date: '2026-08-15',
+        venue: 'UCC Computer Applications Seminar Hall',
+        faculty_name: 'Prof. Anitha Mary',
+        description: 'A 2-day hands-on workshop covering PyTorch, Hugging Face transformers, and Retrieval Augmented Generation (RAG).',
+        expected_participants: 120,
+        resource_person: 'Dr. Sreejith V, Principal Scientist at AI Research Labs',
+        status: 'Approved',
+        admin_remarks: 'Approved by HOD. Excellent initiative.'
+      },
+      {
+        id: 'prop-2',
+        title: 'Seminar on Cybersecurity & Cloud Threat Mitigation',
+        category: 'Seminar',
+        proposed_date: '2026-08-28',
+        venue: 'Main Auditorium',
+        faculty_name: 'Dr. Binu Thomas',
+        description: 'Special session on zero-trust architectures, cloud container security, and DevSecOps best practices.',
+        expected_participants: 90,
+        resource_person: 'Er. Rajesh K, Lead Security Architect',
+        status: 'Pending',
+        admin_remarks: null
+      }
+    ];
+
+    const initialActivities = [
+      {
+        id: 'act-1',
+        proposal_id: 'prop-1',
+        title: 'National Workshop on Generative AI & LLM Architecture',
+        category: 'Workshop',
+        activity_date: '2026-08-15',
+        venue: 'UCC Computer Applications Seminar Hall',
+        faculty_name: 'Prof. Anitha Mary',
+        participants_count: 115,
+        resource_person: 'Dr. Sreejith V, Principal Scientist at AI Research Labs',
+        description: 'The School of Computer Applications conducted a 2-day hands-on workshop covering PyTorch, Hugging Face transformers, and Retrieval Augmented Generation (RAG). Students built autonomous web agents and PDF Q&A bots.',
+        outcomes: '115 MCA students successfully deployed custom RAG pipelines and gained practical AI development skills.',
+        media: [
+          { id: 'm1', type: 'image', url: 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=800&auto=format&fit=crop&q=80' },
+          { id: 'm2', type: 'image', url: 'https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?w=800&auto=format&fit=crop&q=80' }
+        ],
+        has_report: true
+      }
+    ];
+
+    function App() {
+      const [user, setUser] = useState(initialUser);
+      const [page, setPage] = useState('dashboard');
+      const [proposals, setProposals] = useState(initialProposals);
+      const [activities, setActivities] = useState(initialActivities);
+      
+      const [selectedActivity, setSelectedActivity] = useState(null);
+      const [searchQuery, setSearchQuery] = useState('');
+      const [selectedCategory, setSelectedCategory] = useState('All');
+      
+      // Voice dictation state
+      const [isListening, setIsListening] = useState(false);
+
+      // Proposal Form State
+      const [newProp, setNewProp] = useState({
+        title: '', category: 'Workshop', proposed_date: '', venue: '', expected_participants: 50, resource_person: '', description: ''
+      });
+
+      // Admin Modal State
+      const [adminModal, setAdminModal] = useState(null); // { prop, type: 'approve'|'reject' }
+      const [remarksInput, setRemarksInput] = useState('');
+
+      // Social Share Modal
+      const [shareModal, setShareModal] = useState(null);
+
+      // Voice Input Handler
+      const toggleVoice = (fieldSetter) => {
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SpeechRecognition) {
+          alert('Voice dictation requires Google Chrome browser.');
+          return;
+        }
+        if (isListening) {
+          setIsListening(false);
+          return;
+        }
+        const reco = new SpeechRecognition();
+        reco.continuous = false;
+        reco.lang = 'en-US';
+        reco.onstart = () => setIsListening(true);
+        reco.onresult = (e) => {
+          const text = e.results[0][0].transcript;
+          fieldSetter(prev => prev ? prev + ' ' + text : text);
+          setIsListening(false);
+        };
+        reco.onerror = () => setIsListening(false);
+        reco.start();
+      };
+
+      const handleAddProposal = (e) => {
+        e.preventDefault();
+        const p = {
+          id: 'prop-' + Date.now(),
+          ...newProp,
+          faculty_name: user.name,
+          status: 'Pending',
+          admin_remarks: null
+        };
+        setProposals([p, ...proposals]);
+        setNewProp({ title: '', category: 'Workshop', proposed_date: '', venue: '', expected_participants: 50, resource_person: '', description: '' });
+        setPage('proposals');
+      };
+
+      const handleAdminAction = () => {
+        if (!adminModal) return;
+        const updated = proposals.map(p => {
+          if (p.id === adminModal.prop.id) {
+            return {
+              ...p,
+              status: adminModal.type === 'approve' ? 'Approved' : 'Rejected',
+              admin_remarks: remarksInput || (adminModal.type === 'approve' ? 'Approved by HOD' : 'Rejected')
+            };
+          }
+          return p;
+        });
+        setProposals(updated);
+        setAdminModal(null);
+        setRemarksInput('');
+      };
+
+      const handleCreateActivityFromProp = (prop) => {
+        const newAct = {
+          id: 'act-' + Date.now(),
+          proposal_id: prop.id,
+          title: prop.title,
+          category: prop.category,
+          activity_date: prop.proposed_date,
+          venue: prop.venue,
+          faculty_name: prop.faculty_name,
+          participants_count: prop.expected_participants,
+          resource_person: prop.resource_person,
+          description: prop.description,
+          outcomes: 'Detailed activity outcomes and student competencies acquired.',
+          media: [{ id: 'm1', type: 'image', url: 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=800&auto=format&fit=crop&q=80' }],
+          has_report: false
+        };
+        setActivities([newAct, ...activities]);
+        setSelectedActivity(newAct);
+        setPage('activity-detail');
+      };
+
+      const filteredArchive = activities.filter(a => {
+        const matchesSearch = !searchQuery || a.title.toLowerCase().includes(searchQuery.toLowerCase()) || a.description.toLowerCase().includes(searchQuery.toLowerCase());
+        const matchesCategory = selectedCategory === 'All' || a.category === selectedCategory;
+        return matchesSearch && matchesCategory;
+      });
+
+      return (
+        <div className="min-h-screen flex flex-col">
+          {/* Header */}
+          <nav className="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-sm">
+            <div className="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center">
+              <div className="flex items-center space-x-3 cursor-pointer" onClick={() => setPage('dashboard')}>
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#1A7A6A] to-[#0F5548] flex items-center justify-center text-white font-extrabold text-lg shadow-md">
+                  UCC
+                </div>
+                <div>
+                  <div className="font-extrabold text-base text-[#1F3864]">UCC RMS</div>
+                  <div className="text-[10px] font-bold text-[#1A7A6A]">School of Computer Applications</div>
+                </div>
+              </div>
+
+              <div className="flex space-x-1 text-xs font-bold">
+                <button onClick={() => setPage('dashboard')} className={`px-3 py-2 rounded-lg ${page === 'dashboard' ? 'bg-[#E8F5F2] text-[#0F5548]' : 'text-slate-600 hover:bg-slate-50'}`}>Dashboard</button>
+                <button onClick={() => setPage('proposals')} className={`px-3 py-2 rounded-lg ${page === 'proposals' || page === 'new-proposal' ? 'bg-[#E8F5F2] text-[#0F5548]' : 'text-slate-600 hover:bg-slate-50'}`}>Proposals ({proposals.length})</button>
+                <button onClick={() => setPage('archive')} className={`px-3 py-2 rounded-lg ${page === 'archive' ? 'bg-[#E8F5F2] text-[#0F5548]' : 'text-slate-600 hover:bg-slate-50'}`}>Archive ({activities.length})</button>
+                {user.role === 'admin' && (
+                  <button onClick={() => setPage('admin')} className={`px-3 py-2 rounded-lg ${page === 'admin' ? 'bg-amber-100 text-amber-900' : 'text-amber-700 hover:bg-amber-50'}`}>Admin Panel</button>
+                )}
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <button 
+                  onClick={() => setUser(user.role === 'admin' ? initialUser : { name: 'Dr. Binu Thomas (HOD)', role: 'admin', email: 'admin@ucc.edu.in' })}
+                  className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 rounded-lg text-[11px] font-bold text-slate-700 border border-slate-200"
+                >
+                  Switch Role: <span className="text-[#1A7A6A]">{user.role.toUpperCase()}</span>
+                </button>
+              </div>
+            </div>
+          </nav>
+
+          {/* Main Content */}
+          <main className="flex-1 max-w-7xl mx-auto px-4 py-8 w-full space-y-6">
+            
+            {/* Page: Dashboard */}
+            {page === 'dashboard' && (
+              <div className="space-y-6">
+                <div className="bg-gradient-to-r from-[#1F3864] via-[#0F5548] to-[#1A7A6A] rounded-3xl p-8 text-white shadow-xl">
+                  <span className="text-xs font-bold uppercase tracking-wider px-3 py-1 bg-white/20 rounded-full">Academic Session 2026</span>
+                  <h1 className="text-2xl font-extrabold mt-3">Welcome, {user.name}!</h1>
+                  <p className="text-xs text-emerald-100 mt-1 max-w-xl">Union Christian College, Aluva — Department Activity & Report Management System (RMS)</p>
+                  <div className="mt-6 flex space-x-3">
+                    <button onClick={() => setPage('new-proposal')} className="px-4 py-2.5 bg-white text-[#0F5548] font-bold text-xs rounded-xl hover:bg-emerald-50">Propose New Activity</button>
+                    <button onClick={() => setPage('archive')} className="px-4 py-2.5 bg-white/10 hover:bg-white/20 text-white font-bold text-xs rounded-xl backdrop-blur-md">Browse Activity Archive</button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-4 gap-4">
+                  <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                    <div className="text-2xl font-extrabold text-slate-800">{proposals.length}</div>
+                    <div className="text-xs font-semibold text-slate-500">Total Proposals</div>
+                  </div>
+                  <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                    <div className="text-2xl font-extrabold text-slate-800">{proposals.filter(p => p.status === 'Pending').length}</div>
+                    <div className="text-xs font-semibold text-slate-500">Pending Approvals</div>
+                  </div>
+                  <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                    <div className="text-2xl font-extrabold text-slate-800">{activities.length}</div>
+                    <div className="text-xs font-semibold text-slate-500">Completed Activities</div>
+                  </div>
+                  <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                    <div className="text-2xl font-extrabold text-slate-800">115</div>
+                    <div className="text-xs font-semibold text-slate-500">Students Impacted</div>
+                  </div>
+                </div>
+
+                <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm space-y-4">
+                  <h2 className="text-base font-bold text-slate-900">Recent Departmental Activities</h2>
+                  <div className="space-y-3">
+                    {activities.map(a => (
+                      <div key={a.id} className="p-4 bg-slate-50 rounded-xl border border-slate-200 flex justify-between items-center">
+                        <div>
+                          <span className="px-2 py-0.5 bg-[#E8F5F2] text-[#0F5548] text-[10px] font-bold rounded">{a.category}</span>
+                          <h3 className="text-sm font-bold text-slate-800 mt-1">{a.title}</h3>
+                          <p className="text-xs text-slate-500">📍 {a.venue} • {a.faculty_name}</p>
+                        </div>
+                        <button onClick={() => { setSelectedActivity(a); setPage('activity-detail'); }} className="px-3 py-1.5 bg-[#1F3864] text-white text-xs font-bold rounded-lg">View Record</button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Page: Proposal List */}
+            {page === 'proposals' && (
+              <div className="space-y-6">
+                <div className="flex justify-between items-center bg-white p-6 rounded-3xl border border-slate-200">
+                  <div>
+                    <h1 className="text-xl font-extrabold text-[#1F3864]">Activity Proposals</h1>
+                    <p className="text-xs text-slate-500">Submit and track activity approval workflow</p>
+                  </div>
+                  <button onClick={() => setPage('new-proposal')} className="px-4 py-2.5 bg-[#1A7A6A] text-white font-bold text-xs rounded-xl">New Proposal</button>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  {proposals.map(p => (
+                    <div key={p.id} className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm flex flex-col justify-between space-y-4">
+                      <div>
+                        <div className="flex justify-between items-start">
+                          <span className="px-2.5 py-1 bg-[#E8F5F2] text-[#0F5548] text-[10px] font-bold rounded">{p.category}</span>
+                          <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${p.status === 'Approved' ? 'badge-approved' : p.status === 'Rejected' ? 'badge-rejected' : 'badge-pending'}`}>{p.status}</span>
+                        </div>
+                        <h3 className="text-base font-bold text-slate-900 mt-3">{p.title}</h3>
+                        <p className="text-xs text-slate-500 mt-1">{p.description}</p>
+                        <div className="mt-4 pt-3 border-t border-slate-100 text-xs text-slate-600 space-y-1">
+                          <div>Proposed Date: <strong>{p.proposed_date}</strong></div>
+                          <div>Venue: <strong>{p.venue}</strong></div>
+                          <div>Faculty: <strong>{p.faculty_name}</strong></div>
+                        </div>
+                      </div>
+
+                      <div className="pt-3 border-t border-slate-100 flex justify-between items-center">
+                        {p.status === 'Approved' ? (
+                          <button onClick={() => handleCreateActivityFromProp(p)} className="px-3 py-1.5 bg-[#1A7A6A] text-white text-xs font-bold rounded-lg">Document Activity</button>
+                        ) : <span className="text-[10px] text-slate-400">Awaiting approval</span>}
+
+                        {user.role === 'admin' && p.status === 'Pending' && (
+                          <div className="space-x-1">
+                            <button onClick={() => { setAdminModal({ prop: p, type: 'approve' }); setRemarksInput(''); }} className="px-2.5 py-1 bg-emerald-600 text-white text-xs font-bold rounded-md">Approve</button>
+                            <button onClick={() => { setAdminModal({ prop: p, type: 'reject' }); setRemarksInput(''); }} className="px-2.5 py-1 bg-rose-600 text-white text-xs font-bold rounded-md">Reject</button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Page: New Proposal */}
+            {page === 'new-proposal' && (
+              <div className="max-w-2xl mx-auto bg-white rounded-3xl p-8 border border-slate-200 shadow-xl space-y-6">
+                <h1 className="text-xl font-extrabold text-[#1F3864]">Submit Activity Proposal</h1>
+                <form onSubmit={handleAddProposal} className="space-y-4 text-xs">
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">Title *</label>
+                    <input type="text" required value={newProp.title} onChange={e => setNewProp({...newProp, title: e.target.value})} placeholder="National Seminar on Artificial Intelligence" className="w-full p-2.5 border rounded-xl" />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block font-bold text-slate-700 mb-1">Category *</label>
+                      <select value={newProp.category} onChange={e => setNewProp({...newProp, category: e.target.value})} className="w-full p-2.5 border rounded-xl">
+                        {['Workshop', 'Seminar', 'Guest Lecture', 'FDP', 'Industrial Visit', 'Cultural', 'Technical Competition'].map(c => <option key={c} value={c}>{c}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block font-bold text-slate-700 mb-1">Proposed Date *</label>
+                      <input type="date" required value={newProp.proposed_date} onChange={e => setNewProp({...newProp, proposed_date: e.target.value})} className="w-full p-2.5 border rounded-xl" />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">Proposed Venue *</label>
+                    <input type="text" required value={newProp.venue} onChange={e => setNewProp({...newProp, venue: e.target.value})} placeholder="UCC Seminar Hall" className="w-full p-2.5 border rounded-xl" />
+                  </div>
+                  <div>
+                    <div className="flex justify-between items-center mb-1">
+                      <label className="block font-bold text-slate-700">Description *</label>
+                      <button type="button" onClick={() => toggleVoice((fn) => setNewProp(p => ({...p, description: fn(p.description)})))} className={`px-2 py-0.5 rounded text-[10px] font-bold ${isListening ? 'bg-rose-500 text-white animate-pulse' : 'bg-emerald-100 text-emerald-800'}`}>🎤 {isListening ? 'Listening...' : 'Voice Input'}</button>
+                    </div>
+                    <textarea rows="4" required value={newProp.description} onChange={e => setNewProp({...newProp, description: e.target.value})} placeholder="Provide detailed schedule and objectives..." className="w-full p-3 border rounded-xl" />
+                  </div>
+                  <button type="submit" className="w-full py-3 bg-[#1A7A6A] text-white font-bold rounded-xl text-sm shadow-md">Submit Proposal</button>
+                </form>
+              </div>
+            )}
+
+            {/* Page: Archive */}
+            {page === 'archive' && (
+              <div className="space-y-6">
+                <div className="bg-white p-6 rounded-3xl border border-slate-200 space-y-4">
+                  <h1 className="text-xl font-extrabold text-[#1F3864]">Departmental Activity Archive</h1>
+                  <div className="flex space-x-3">
+                    <input type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Search keyword (e.g. AI, Workshop)..." className="flex-1 p-2.5 border rounded-xl text-xs" />
+                    <select value={selectedCategory} onChange={e => setSelectedCategory(e.target.value)} className="p-2.5 border rounded-xl text-xs">
+                      {['All', 'Workshop', 'Seminar', 'Guest Lecture', 'FDP', 'Industrial Visit'].map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  {filteredArchive.map(a => (
+                    <div key={a.id} className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm space-y-3">
+                      <span className="px-2.5 py-0.5 bg-[#E8F5F2] text-[#0F5548] text-[10px] font-bold rounded">{a.category}</span>
+                      <h3 className="text-base font-bold text-slate-900">{a.title}</h3>
+                      <p className="text-xs text-slate-500 line-clamp-2">{a.description}</p>
+                      <button onClick={() => { setSelectedActivity(a); setPage('activity-detail'); }} className="px-3 py-1.5 bg-[#1F3864] text-white text-xs font-bold rounded-lg">View Full Record</button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Page: Activity Detail */}
+            {page === 'activity-detail' && selectedActivity && (
+              <div className="max-w-4xl mx-auto bg-white rounded-3xl p-8 border border-slate-200 shadow-xl space-y-6">
+                <div className="flex justify-between items-start border-b pb-4">
+                  <div>
+                    <span className="px-3 py-1 bg-[#E8F5F2] text-[#0F5548] text-xs font-bold rounded-lg">{selectedActivity.category}</span>
+                    <h1 className="text-2xl font-extrabold text-[#1F3864] mt-2">{selectedActivity.title}</h1>
+                    <p className="text-xs text-slate-500">📅 {selectedActivity.activity_date} • 📍 {selectedActivity.venue}</p>
+                  </div>
+                  <button onClick={() => setShareModal(selectedActivity)} className="px-3 py-2 bg-slate-100 text-slate-700 font-bold text-xs rounded-xl">Share Post</button>
+                </div>
+
+                <div className="p-4 bg-[#E8F5F2] rounded-2xl border border-[#B4E3D8] flex justify-between items-center">
+                  <div>
+                    <h4 className="text-xs font-bold text-[#0F5548]">AI Structured Report (Gemini 1.5 Flash)</h4>
+                    <p className="text-[11px] text-slate-600">Formal academic narrative synthesis ready for PDF output</p>
+                  </div>
+                  <button onClick={() => alert('PDF report compiled! Cloudinary link ready.')} className="px-4 py-2 bg-[#1A7A6A] text-white font-bold text-xs rounded-xl">Download PDF Report</button>
+                </div>
+
+                <div className="space-y-4 text-xs text-slate-700">
+                  <h3 className="font-bold text-[#1F3864]">Event Proceedings</h3>
+                  <p>{selectedActivity.description}</p>
+                  <h3 className="font-bold text-[#1F3864]">Outcomes & Student Learning</h3>
+                  <p>{selectedActivity.outcomes}</p>
+                </div>
+              </div>
+            )}
+
+            {/* Page: Admin Panel */}
+            {page === 'admin' && (
+              <div className="space-y-6">
+                <div className="bg-gradient-to-r from-amber-900 to-[#1F3864] p-8 rounded-3xl text-white">
+                  <h1 className="text-2xl font-extrabold">HOD Admin Operations</h1>
+                  <p className="text-xs text-amber-100 mt-1">Manage faculty accounts and synthesize annual department summaries</p>
+                </div>
+                <div className="bg-white p-6 rounded-2xl border border-slate-200">
+                  <h3 className="text-base font-bold text-slate-900 mb-3">Generate Annual Summary Report</h3>
+                  <button onClick={() => alert('Generated Annual Summary Report for 2026!')} className="px-4 py-2 bg-[#1F3864] text-white font-bold text-xs rounded-xl">Synthesize 2026 Annual PDF Report</button>
+                </div>
+              </div>
+            )}
+
+          </main>
+
+          {/* Admin Approval Modal */}
+          {adminModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+              <div className="bg-white rounded-2xl max-w-md w-full p-6 space-y-4">
+                <h3 className="text-base font-bold text-[#1F3864]">{adminModal.type === 'approve' ? 'Approve Proposal' : 'Reject Proposal'}</h3>
+                <p className="text-xs text-slate-600">Proposal: <strong>{adminModal.prop.title}</strong></p>
+                <textarea rows="3" value={remarksInput} onChange={e => setRemarksInput(e.target.value)} placeholder="Admin remarks..." className="w-full p-3 border rounded-xl text-xs" />
+                <div className="flex justify-end space-x-2">
+                  <button onClick={() => setAdminModal(null)} className="px-3 py-1.5 text-xs font-bold text-slate-600">Cancel</button>
+                  <button onClick={handleAdminAction} className={`px-4 py-1.5 text-xs font-bold text-white rounded-lg ${adminModal.type === 'approve' ? 'bg-emerald-600' : 'bg-rose-600'}`}>Confirm</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Social Share Modal */}
+          {shareModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+              <div className="bg-white rounded-2xl max-w-md w-full p-6 space-y-4">
+                <h3 className="text-base font-bold text-[#1A7A6A]">Social Media Share Card</h3>
+                <div className="bg-slate-50 p-3 rounded-xl border text-xs font-mono">
+                  🚀 UCC Aluva MCA Dept hosted "{shareModal.title}" ({shareModal.category})! 📍 {shareModal.venue} #UCCAluva #MCA
+                </div>
+                <button onClick={() => { navigator.clipboard.writeText(`UCC Aluva hosted ${shareModal.title}`); alert('Copied to clipboard!'); setShareModal(null); }} className="w-full py-2 bg-[#0A66C2] text-white font-bold text-xs rounded-xl">Copy LinkedIn Text</button>
+                <button onClick={() => setShareModal(null)} className="w-full py-1 text-xs font-bold text-slate-500">Close</button>
+              </div>
+            </div>
+          )}
+
+          <footer className="bg-white border-t py-4 text-center text-xs text-slate-500">
+            School of Computer Applications, Union Christian College, Aluva (Autonomous) • MCA CP 307 Mini Project
+          </footer>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>

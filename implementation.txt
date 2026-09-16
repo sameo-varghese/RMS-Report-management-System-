@@ -1,0 +1,356 @@
+You are helping build a full-stack web and mobile application called the 
+"AI-Powered Department Archive and Activity Report Management System" 
+(also referred to as RMS — Report Management System) for the School of 
+Computer Applications, Union Christian College, Aluva (Autonomous), 
+as part of the MCA CP 307 Mini Project.
+
+═══════════════════════════════════════════
+PROJECT OVERVIEW
+═══════════════════════════════════════════
+
+The system replaces the manual, fragmented process of recording and 
+reporting departmental activities. Faculty members can propose activities, 
+get them approved by an Admin, document them with photos and videos, and 
+generate AI-assisted PDF reports. The system also supports keyword search, 
+date filtering, social sharing, voice input, and annual report generation.
+
+═══════════════════════════════════════════
+TECH STACK
+═══════════════════════════════════════════
+
+Frontend (Web):
+- React 18 + Vite
+- TailwindCSS
+- React Router v6
+- React Query (TanStack Query) for API state management
+
+Frontend (Mobile):
+- Expo SDK 50 (React Native)
+- NativeWind (Tailwind for React Native)
+- Expo Router (file-based navigation)
+
+Backend:
+- Python 3.11
+- FastAPI
+- Pydantic v2 (data validation)
+- python-jose (JWT authentication)
+- bcrypt (password hashing)
+- Motor (async MongoDB driver)
+
+Database:
+- MongoDB Atlas (M0 free cluster)
+
+Media Storage:
+- Cloudinary (free tier)
+- Images: JPG, PNG, WEBP — max 10 MB each
+- Videos: MP4 — max 100 MB each
+
+AI:
+- Google Gemini 1.5 Flash API (free tier)
+- Used for generating structured activity report narratives
+- Also used for annual department summary generation
+
+PDF Generation:
+- WeasyPrint (Python library)
+- HTML/CSS templates compiled to PDF server-side
+
+Voice Input:
+- Web Speech API (SpeechRecognition) on web (Chrome only)
+- @react-native-voice/voice on Expo mobile
+
+Deployment:
+- Frontend: Vercel (free)
+- Backend: Render.com (free tier)
+- Database: MongoDB Atlas (free M0 cluster)
+
+Version Control:
+- Git + GitHub
+
+═══════════════════════════════════════════
+MONOREPO STRUCTURE
+═══════════════════════════════════════════
+
+project/
+├── backend/         ← FastAPI
+│   ├── main.py
+│   ├── routers/
+│   │   ├── auth.py
+│   │   ├── proposals.py
+│   │   ├── activities.py
+│   │   ├── media.py
+│   │   ├── reports.py
+│   │   └── users.py
+│   ├── models/
+│   │   ├── user.py
+│   │   ├── proposal.py
+│   │   ├── activity.py
+│   │   ├── media.py
+│   │   └── report.py
+│   ├── services/
+│   │   ├── cloudinary_service.py
+│   │   ├── gemini_service.py
+│   │   └── pdf_service.py
+│   ├── core/
+│   │   ├── auth.py        ← JWT logic
+│   │   ├── config.py      ← env variables
+│   │   └── database.py    ← MongoDB connection
+│   └── requirements.txt
+│
+├── web/             ← React + Vite
+│   ├── src/
+│   │   ├── pages/
+│   │   │   ├── Login.jsx
+│   │   │   ├── Dashboard.jsx
+│   │   │   ├── ProposalForm.jsx
+│   │   │   ├── ProposalList.jsx
+│   │   │   ├── ActivityForm.jsx
+│   │   │   ├── ActivityDetail.jsx
+│   │   │   ├── Archive.jsx
+│   │   │   ├── ReportView.jsx
+│   │   │   └── AdminPanel.jsx
+│   │   ├── components/
+│   │   ├── api/           ← axios API calls
+│   │   └── main.jsx
+│   └── package.json
+│
+└── mobile/          ← Expo
+    ├── app/         ← Expo Router pages
+    ├── components/
+    └── package.json
+
+═══════════════════════════════════════════
+USER ROLES
+═══════════════════════════════════════════
+
+1. Faculty
+   - Login / logout
+   - Submit activity proposals
+   - View proposal status (Pending / Approved / Rejected)
+   - Document approved activities (text + media upload)
+   - Use voice input for description fields
+   - Generate AI PDF report for their activities
+   - Browse and search the activity archive
+   - Share activities to LinkedIn / Instagram
+   - Download generated PDF reports
+
+2. Admin (HOD or designated staff)
+   - All Faculty permissions
+   - Approve or reject proposals with remarks
+   - Manage faculty accounts (add, activate, deactivate)
+   - Generate annual department summary PDF report
+   - View all activities across all faculty
+
+═══════════════════════════════════════════
+DATABASE COLLECTIONS (MongoDB)
+═══════════════════════════════════════════
+
+1. users
+   - _id: ObjectId (PK)
+   - name: String (NOT NULL)
+   - email: String (UNIQUE, NOT NULL)
+   - password_hash: String (NOT NULL)
+   - role: String — "faculty" or "admin"
+   - is_active: Boolean (DEFAULT: true)
+   - created_at: DateTime
+
+2. proposals
+   - _id: ObjectId (PK)
+   - faculty_id: ObjectId (FK → users)
+   - title: String (NOT NULL)
+   - description: String (NOT NULL)
+   - category: String (NOT NULL)
+     [Workshop | Seminar | Guest Lecture | FDP | Industrial Visit | Cultural | Technical Competition | Other]
+   - proposed_date: Date (NOT NULL)
+   - venue: String (NOT NULL)
+   - expected_participants: Integer
+   - resource_person: String (nullable)
+   - status: String — "Pending" | "Approved" | "Rejected"
+   - admin_remarks: String (nullable)
+   - created_at: DateTime
+
+3. activities
+   - _id: ObjectId (PK)
+   - proposal_id: ObjectId (FK → proposals)
+   - faculty_id: ObjectId (FK → users)
+   - title: String (NOT NULL)
+   - description: String (NOT NULL)
+   - category: String (NOT NULL)
+   - activity_date: Date (NOT NULL)
+   - venue: String (NOT NULL)
+   - participants_count: Integer (nullable)
+   - resource_person: String (nullable)
+   - outcomes: String (nullable)
+   - created_at: DateTime
+   - updated_at: DateTime
+
+4. media
+   - _id: ObjectId (PK)
+   - activity_id: ObjectId (FK → activities)
+   - media_type: String — "image" | "video"
+   - cloudinary_url: String (NOT NULL)
+   - cloudinary_public_id: String (NOT NULL)
+   - uploaded_at: DateTime
+
+5. reports
+   - _id: ObjectId (PK)
+   - report_type: String — "activity" | "annual"
+   - activity_id: ObjectId (nullable — only for activity reports)
+   - generated_by: ObjectId (FK → users)
+   - ai_narrative: String (NOT NULL)
+   - pdf_url: String (NOT NULL — Cloudinary URL)
+   - cloudinary_public_id: String (for deletion on regeneration)
+   - year: Integer (nullable — only for annual reports)
+   - generated_at: DateTime
+
+═══════════════════════════════════════════
+API ENDPOINTS
+═══════════════════════════════════════════
+
+AUTH
+  POST   /auth/login              → returns JWT token
+  POST   /auth/logout
+
+USERS (Admin only)
+  GET    /users                   → list all faculty
+  POST   /users                   → create faculty account
+  PUT    /users/{id}/deactivate
+  PUT    /users/{id}/activate
+
+PROPOSALS
+  POST   /proposals               → faculty submits proposal
+  GET    /proposals               → list (faculty sees own, admin sees all)
+  GET    /proposals/{id}          → detail
+  PUT    /proposals/{id}/approve  → admin only
+  PUT    /proposals/{id}/reject   → admin only (requires remarks)
+  DELETE /proposals/{id}          → faculty (own, pending only)
+
+ACTIVITIES
+  POST   /activities              → create from approved proposal
+  GET    /activities              → list all (searchable, filterable)
+  GET    /activities/{id}         → detail with media
+  PUT    /activities/{id}         → update
+  DELETE /activities/{id}         → cascades media deletion from Cloudinary
+
+MEDIA
+  POST   /media/upload            → upload to Cloudinary, link to activity
+  DELETE /media/{id}              → delete from Cloudinary + MongoDB
+
+REPORTS
+  POST   /reports/generate        → generate activity PDF report
+  POST   /reports/annual          → generate annual summary (admin only)
+  GET    /reports/{activity_id}   → get existing report for an activity
+  DELETE /reports/{id}            → delete report + Cloudinary PDF
+
+═══════════════════════════════════════════
+KEY BUSINESS RULES
+═══════════════════════════════════════════
+
+1. A proposal must be Approved before an activity can be created from it
+2. Faculty can only edit/delete their own records
+3. Admin can edit/delete any record
+4. Deleting an activity must cascade-delete all linked media from 
+   Cloudinary and MongoDB, and the linked report if it exists
+5. On report regeneration: delete old PDF from Cloudinary first, 
+   then generate new one — only one report per activity at any time
+6. JWT tokens expire after 24 hours
+7. All secrets stored as environment variables — never hardcoded
+8. MongoDB text index on activities.title and activities.description 
+   for keyword search
+9. Pagination: 20 items per page using cursor-based pagination 
+   (ObjectId as cursor)
+10. Annual report: check if activities exist for selected year before 
+    calling Gemini — return error if none found
+
+═══════════════════════════════════════════
+AI REPORT GENERATION FLOW
+═══════════════════════════════════════════
+
+1. Fetch activity document from MongoDB (title, description, category,
+   date, venue, participants, resource_person, outcomes)
+2. Fetch linked media URLs from media collection
+3. Build a structured prompt:
+   - System: "You are a professional report writer for an academic 
+     department. Write a formal activity report in the following 
+     structure: Introduction, Event Proceedings, Key Highlights, 
+     Outcomes and Learning, Conclusion. Use formal academic language."
+   - User: [activity data as structured text]
+4. Call Gemini 1.5 Flash API
+5. Receive narrative text
+6. Build HTML report template with:
+   - Department header (UCC — School of Computer Applications)
+   - Activity title, date, venue, category, participants
+   - AI narrative sections
+   - Embedded Cloudinary image URLs
+7. Compile HTML → PDF using WeasyPrint
+8. Upload PDF to Cloudinary
+9. Save report document to MongoDB with pdf_url
+10. Return download link to frontend
+
+═══════════════════════════════════════════
+ENVIRONMENT VARIABLES REQUIRED
+═══════════════════════════════════════════
+
+MONGODB_URI=
+CLOUDINARY_CLOUD_NAME=
+CLOUDINARY_API_KEY=
+CLOUDINARY_API_SECRET=
+GEMINI_API_KEY=
+JWT_SECRET=
+JWT_EXPIRE_HOURS=24
+FRONTEND_URL=
+
+═══════════════════════════════════════════
+COLOUR SCHEME (for UI consistency)
+═══════════════════════════════════════════
+
+Primary:   #1A7A6A  (teal)
+Dark:      #0F5548  (teal dark)
+Light:     #E8F5F2  (teal light)
+Navy:      #1F3864
+White:     #FFFFFF
+Font:      Arial / Segoe UI
+
+═══════════════════════════════════════════
+DEVELOPMENT PHASES
+═══════════════════════════════════════════
+
+Phase 1 — Core (Week 1–2):
+  - FastAPI project setup + MongoDB connection
+  - Auth endpoints (login, JWT)
+  - User model + Admin account management
+  - Proposal CRUD + approval workflow
+  - React web app setup + Login page + Dashboard
+  - Proposal form + proposal list with status
+
+Phase 2 — AI & Reports (Week 3–4):
+  - Activity CRUD
+  - Cloudinary media upload integration
+  - Gemini API integration + prompt engineering
+  - WeasyPrint PDF generation
+  - Annual report generation
+  - Report storage and download flow
+
+Phase 3 — Extras (Week 5):
+  - Keyword search + date filter on archive
+  - Voice input (Web Speech API on web)
+  - LinkedIn + Instagram share links
+  - Expo mobile app setup
+  - Mobile screens mirroring web features
+
+═══════════════════════════════════════════
+NOTES FOR DEVELOPMENT
+═══════════════════════════════════════════
+
+- Use async/await throughout FastAPI (Motor for async MongoDB)
+- All FastAPI routes require JWT verification except /auth/login
+- CORS must be configured to allow the Vercel frontend URL
+- WeasyPrint requires system fonts and Cairo — install system 
+  dependencies before deploying on Render.com
+- Web Speech API only works in Chrome — document this as a 
+  known limitation
+- Cloudinary delete requires cloudinary_public_id — always store 
+  it alongside the URL in MongoDB
+- For the Expo mobile app, voice input uses 
+  @react-native-voice/voice (native, not browser-dependent)
+- Render.com free tier sleeps after 15 min inactivity — 
+  use a cron ping service to keep it awake during demos
