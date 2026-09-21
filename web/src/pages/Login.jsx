@@ -21,15 +21,15 @@ export const Login = () => {
     }
   };
 
-  const fillDemo = (role) => {
-    if (role === 'admin') {
-      setEmail('admin@ucc.edu.in');
-      setPassword('admin123');
-    } else {
-      setEmail('faculty@ucc.edu.in');
-      setPassword('faculty123');
-    }
-  };
+  // const fillDemo = (role) => {
+  //   if (role === 'admin') {
+  //     setEmail('admin@ucc.edu.in');
+  //     setPassword('admin123');
+  //   } else {
+  //     setEmail('faculty@ucc.edu.in');
+  //     setPassword('faculty123');
+  //   }
+  // };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-[#0F5548] to-[#1F3864] flex items-center justify-center p-4">
@@ -95,7 +95,7 @@ export const Login = () => {
           </button>
         </form>
 
-        {/* Demo Credentials Quick Fill */}
+        {/* Demo Credentials Quick Fill
         <div className="mt-8 pt-6 border-t border-slate-200 text-center">
           <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-3">Quick Demo Login</p>
           <div className="grid grid-cols-2 gap-2">
@@ -116,7 +116,7 @@ export const Login = () => {
               <span>Admin (HOD)</span>
             </button>
           </div>
-        </div>
+        </div> */}
       </div>
     </div>
   );
